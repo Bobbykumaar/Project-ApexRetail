@@ -1,137 +1,232 @@
-# Retail Data Engineering — Medallion Pipeline (Databricks, PySpark, Delta Lake)
+# Project ApexRetail
 
-A production-grade, multi-gigabyte retail data pipeline built on the **Bronze / Silver / Gold
-medallion architecture**, designed to run on Databricks. The pipeline generates ~10GB of
-realistic, intentionally messy retail data entirely with distributed Spark transformations
-(no Python loops), and then cleans, deduplicates, and aggregates it at scale — including
-handling **real data skew**.
+ApexRetail is a large-scale retail data engineering project built using Databricks, PySpark, and Delta Lake following the Medallion Architecture (Bronze, Silver, and Gold layers).
+
+The goal of this project was to simulate a real-world retail data platform capable of processing multi-gigabyte datasets while handling common production challenges such as data quality issues, duplicate records, data skew, incremental ingestion, and analytical reporting.
+
+The project generates approximately 10GB of retail data and processes it through an end-to-end pipeline to produce analytics-ready datasets and business KPIs.
 
 ---
 
-## Project Layout
+## Architecture
 
+```text
+Raw Data
+    ↓
+Bronze Layer
+(Ingestion & Audit Logging)
+    ↓
+Silver Layer
+(Cleaning, Validation, Deduplication)
+    ↓
+Gold Layer
+(Business Aggregations & Reporting)
 ```
+
+---
+
+## Technologies Used
+
+* Databricks
+* Apache Spark (PySpark)
+* Delta Lake
+* Spark SQL
+* Structured Streaming
+* Auto Loader Pattern
+* Delta Optimization (OPTIMIZE & ZORDER)
+
+---
+
+## Dataset Scale
+
+| Dataset           | Records |
+| ----------------- | ------- |
+| Customers         | 1M+     |
+| Products          | 50K+    |
+| Orders            | 20M+    |
+| Order Items       | 45M+    |
+| Total Data Volume | ~10GB   |
+
+The datasets are generated entirely using distributed Spark transformations such as `spark.range()`, `explode()`, and hash-based expressions without using Python loops.
+
+---
+
+## Real-World Data Quality Scenarios
+
+To make the project closer to production systems, intentional data quality issues were introduced:
+
+* Duplicate customer records
+* Duplicate orders
+* Invalid and null emails
+* Missing phone numbers
+* Missing city information
+* Negative product prices
+* Negative quantities
+* Missing unit prices
+* Revenue inconsistencies
+* Large-scale data skew
+
+These issues are detected and handled during Silver layer processing.
+
+---
+
+## Bronze Layer
+
+The Bronze layer is responsible for ingesting raw datasets into Delta tables.
+
+Features:
+
+* Raw data ingestion
+* Delta table creation
+* Audit logging
+* Incremental ingestion pattern
+* Auto Loader implementation for large datasets
+
+An audit table is maintained to track:
+
+* Pipeline status
+* Row counts
+* Processing duration
+* Error details
+
+---
+
+## Silver Layer
+
+The Silver layer performs data cleansing and transformation.
+
+Key operations include:
+
+* Data validation
+* Deduplication using Window Functions
+* Email validation
+* Null handling
+* Standardization
+* Data quality flagging
+
+Instead of using `dropDuplicates()`, duplicate records are handled using:
+
+```sql
+ROW_NUMBER()
+OVER(
+PARTITION BY customer_id
+ORDER BY updated_timestamp DESC
+)
+```
+
+This ensures deterministic record selection.
+
+---
+
+## Handling Data Skew
+
+One of the objectives of the project was to simulate skewed retail workloads where a small percentage of products generate a large percentage of transactions.
+
+Optimization techniques used:
+
+* Broadcast Joins
+* Adaptive Query Execution (AQE)
+* Partition Optimization
+* Salting Strategy (Reference Implementation)
+
+---
+
+## Gold Layer
+
+The Gold layer contains business-ready datasets and KPIs.
+
+Generated outputs include:
+
+* Customer Summary
+* Product Performance
+* Monthly Revenue Trends
+* Category Performance
+* Data Quality Dashboard
+
+These tables can be consumed directly by BI tools and reporting systems.
+
+---
+
+## Delta Lake Optimizations
+
+To improve query performance, Delta tables are optimized using:
+
+* Partitioning by order date
+* OPTIMIZE command
+* ZORDER BY
+
+Example:
+
+```sql
+OPTIMIZE fact_sales
+ZORDER BY (customer_id, product_id)
+```
+
+This significantly improves query performance on frequently filtered columns.
+
+---
+
+## Key Data Engineering Concepts Demonstrated
+
+* Medallion Architecture
+* Delta Lake
+* Distributed Data Processing
+* Spark SQL
+* Window Functions
+* Broadcast Joins
+* Data Skew Handling
+* Auto Loader
+* Structured Streaming
+* Incremental Processing
+* Data Quality Frameworks
+* Delta Optimization
+* Audit Logging
+
+---
+
+## Project Structure
+
+```text
 retail-medallion-pipeline/
-│
+
 ├── notebooks/
-│   ├── 01_big_data_generator.py     # Distributed PySpark data generator (1M+ customers, 20M+ orders, ~45M order_items)
-│   ├── 02_bronze_ingestion.py       # Auto Loader / batch ingestion + audit log
-│   ├── 03_silver_transformation.py  # Dedup, cleaning, skew-aware joins (broadcast + salting reference)
-│   └── 04_gold_aggregates.py        # Business aggregates + Z-Order optimization
+│   ├── 01_big_data_generator.py
+│   ├── 02_bronze_ingestion.py
+│   ├── 03_silver_transformation.py
+│   └── 04_gold_aggregates.py
 │
 ├── config/
-│   └── cluster_config.json          # Recommended cluster sizes, runtime estimates, scale-down guide
+│   └── cluster_config.json
 │
-├── requirements.txt                 # For local/dev testing only
+├── requirements.txt
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## Scale
+## Future Enhancements
 
-| Dataset       | Rows           | Approx Size |
-|---------------|----------------|-------------|
-| `customers`   | 1,000,000+     | ~250 MB     |
-| `products`    | 50,000+        | ~15 MB      |
-| `orders`      | 20,000,000+    | ~3-4 GB     |
-| `order_items` | ~45,000,000    | ~4-5 GB     |
-| **Total**     |                | **~8-10 GB** |
+Planned improvements include:
 
-All datasets are generated using `spark.range()`, `explode()`, and deterministic
-hash-based expressions — every row is computed independently and in parallel across
-executors. There is no driver-side `for` loop anywhere in the generator.
+* CI/CD integration
+* Airflow orchestration
+* Data lineage tracking
+* Automated monitoring and alerting
+* Cloud object storage integration
+* Real-time streaming pipelines
 
 ---
 
-## Engineered Data Quality & Skew Issues
+## Repository
 
-These are **intentional** — the Silver notebook is written specifically to detect and handle them.
+Project Name: ApexRetail
 
-| Issue | Where | Rate |
-|---|---|---|
-| Duplicate `customer_id` (different `signup_date`) | customers | ~3% |
-| Malformed / null emails | customers | ~6% |
-| Null phone | customers | ~8% |
-| Null city | customers | ~3% |
-| Duplicate `order_id` with later `order_timestamp` | orders | ~2% |
-| Null `delivery_date` | orders | ~3% |
-| Negative / zero `price` | products | ~2% |
-| Negative `quantity` | order_items | ~1% |
-| Null `unit_price` | order_items | ~2% |
-| `line_total` inconsistent with `unit_price * quantity` | order_items | ~5% |
-| **Data skew**: 5% of `product_id` values drive ~50% of `order_items` rows | order_items | by design |
-
----
-
-## Pipeline Stages
-
-### 1. `01_big_data_generator.py` — Distributed Generation
-- Pure Spark — `spark.range()`, `explode(sequence(...))`, deterministic hash expressions
-- Writes raw Delta tables to `dbfs:/mnt/retail_raw/`, partitioned by `order_date`
-- Includes a built-in skew validation step on a 1% sample before the full write
-
-### 2. `02_bronze_ingestion.py` — Bronze Layer
-- `order_items` (largest table) ingested via **Auto Loader pattern**:
-  `spark.readStream.format("delta")` + `trigger(availableNow=True)` — batch-like
-  incremental semantics with checkpoint tracking
-- `customers`, `products`, `orders` ingested via high-performance batch read
-- Every run writes to a Delta **audit log** (`_audit_log`): row counts, duration, status, errors
-
-### 3. `03_silver_transformation.py` — Silver Layer
-- **Deduplication via `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)`** —
-  deterministic "keep latest" / "keep earliest" rules, not `dropDuplicates()`
-- Email regex validation, brand normalization, price/quantity anomaly flags
-- **Skew-aware join strategy**:
-  - `order_items` (45M) join `products` (50K) on `product_id` (the skewed key) →
-    **broadcast join** — eliminates shuffle on the large side entirely
-  - `order_items` join `orders` on `order_id` (not skewed) → AQE skew-join handling
-  - **Salting pattern documented as a reference** for large-large joins on a skewed key
-
-### 4. `04_gold_aggregates.py` — Gold Layer
-- `customer_summary`, `product_summary`, `monthly_revenue`, `category_performance`,
-  `data_quality_summary`
-- **`OPTIMIZE ... ZORDER BY`** applied to:
-  - `fact_sales` (Silver, 45M rows, 1095 date partitions) → `ZORDER BY (customer_id, product_id)`
-  - `customer_summary` → `ZORDER BY (customer_id)`
-  - `product_summary` → `ZORDER BY (category, product_id)`
-
----
-
-## Running on Databricks
-
-1. Import the `notebooks/` folder into your Databricks workspace
-2. Attach to a cluster — see `config/cluster_config.json` for recommended sizing
-3. Run notebooks in order: `01` then `02` then `03` then `04`
-
-### Quick dev/test run
-Edit the scale constants at the top of `01_big_data_generator.py`:
-
-```python
-N_CUSTOMERS = 10_000      # was 1_000_000
-N_PRODUCTS  = 500         # was 50_000
-N_ORDERS    = 200_000     # was 20_000_000
-```
-
-This produces ~440K `order_items` rows and runs end-to-end in a couple of minutes
-on a single-node cluster — useful for validating logic before a full-scale run.
-
----
-
-## Key Engineering Concepts Demonstrated
-
-- Distributed data generation with `spark.range()` and `explode()` — zero driver-side loops
-- Intentional data skew (5% of keys drive 50% of rows) and three strategies to handle it:
-  broadcast join, AQE skew join, and salting (documented reference)
-- Window-function deduplication at 10s-of-millions-of-rows scale
-- Auto Loader / `readStream` + `trigger(availableNow=True)` for incremental batch ingestion
-- Operational audit logging as a first-class Delta table
-- Partitioning by `order_date` plus `OPTIMIZE ZORDER BY` on high-cardinality keys
-- Data quality flagging (not silent row-dropping) surfaced as a Gold-layer table
+GitHub Repository:
+https://github.com/Bobbykumaar/Project-ApexRetail
 
 ---
 
 ## License
 
-MIT — free to use, adapt, and build on.
+MIT License
