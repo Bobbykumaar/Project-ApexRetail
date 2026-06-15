@@ -1,0 +1,45 @@
+{
+  "_comment": "Reference cluster configurations for running this pipeline at different scales. Adjust to your Databricks workspace's available node types.",
+
+  "dev_test_cluster": {
+    "_comment": "For quick iteration. In 01_big_data_generator.py, divide N_CUSTOMERS/N_PRODUCTS/N_ORDERS by 100 (~10K customers, ~500 products, ~200K orders, ~440K order_items).",
+    "node_type_id": "Standard_DS3_v2",
+    "driver_node_type_id": "Standard_DS3_v2",
+    "num_workers": 2,
+    "spark_version": "14.3.x-scala2.12",
+    "autoscale": { "min_workers": 1, "max_workers": 2 }
+  },
+
+  "full_scale_cluster": {
+    "_comment": "For the full 1M customers / 50K products / 20M orders / ~45M order_items run (~8-10GB raw). Recommended minimum.",
+    "node_type_id": "Standard_DS4_v2",
+    "driver_node_type_id": "Standard_DS4_v2",
+    "num_workers": 4,
+    "spark_version": "14.3.x-scala2.12",
+    "autoscale": { "min_workers": 4, "max_workers": 8 },
+    "spark_conf": {
+      "spark.sql.shuffle.partitions": "400",
+      "spark.sql.adaptive.enabled": "true",
+      "spark.sql.adaptive.skewJoin.enabled": "true",
+      "spark.sql.adaptive.coalescePartitions.enabled": "true",
+      "spark.databricks.delta.optimizeWrite.enabled": "true",
+      "spark.databricks.delta.autoCompact.enabled": "true"
+    }
+  },
+
+  "estimated_runtime": {
+    "01_big_data_generator": "12-20 minutes on full_scale_cluster (order_items write dominates)",
+    "02_bronze_ingestion":   "5-10 minutes",
+    "03_silver_transformation": "10-15 minutes (broadcast join + ROW_NUMBER dedup on 45M rows)",
+    "04_gold_aggregates":    "8-12 minutes (includes OPTIMIZE ZORDER on fact_sales)"
+  },
+
+  "scale_down_for_testing": {
+    "_comment": "Edit these constants at the top of 01_big_data_generator.py for a fast local/dev run",
+    "N_CUSTOMERS": 10000,
+    "N_PRODUCTS": 500,
+    "N_ORDERS": 200000,
+    "expected_order_items": "~440000",
+    "estimated_runtime_dev": "1-2 minutes total on a single-node cluster"
+  }
+}

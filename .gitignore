@@ -1,0 +1,30 @@
+# Databricks
+.databricks/
+*.dbc
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Spark / Delta local artifacts (if running locally for testing)
+spark-warehouse/
+metastore_db/
+derby.log
+checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

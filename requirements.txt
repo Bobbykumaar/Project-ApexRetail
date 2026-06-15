@@ -1,0 +1,6 @@
+# For local development / testing outside Databricks.
+# On Databricks clusters, PySpark and Delta are already provided by the runtime —
+# this file is only needed if you want to run a scaled-down version locally.
+
+pyspark>=3.5.0
+delta-spark>=3.1.0
